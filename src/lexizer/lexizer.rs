@@ -4,7 +4,7 @@ use regex::Regex;
 // use std::io;
 
 fn lex_keyword(lexeme: &str) -> bool {
-    let keywords = ["create"];
+    let keywords = ["create", "use"];
     if keywords.contains(&lexeme) {
         return true;
     }
@@ -118,4 +118,3 @@ pub fn lex(line: &str) -> Vec<Token> {
     match_buffer(&mut buffer, &mut tokens);
     tokens
 }
-
