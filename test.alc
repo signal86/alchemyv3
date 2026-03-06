@@ -1,1 +1,2 @@
 create text
+create text: a = "hello, world!"
