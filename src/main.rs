@@ -15,18 +15,22 @@ fn main() -> io::Result<()> {
         ))?;
     }
 
-    for (i, arg) in args.iter().enumerate() {
-        println!("{}: {}", i, arg);
-    }
+    // for (i, arg) in args.iter().enumerate() {
+    // println!("{}: {}", i, arg);
+    // }
 
     let fname = &args[1];
     let file = File::open(fname)?;
     let r = BufReader::new(file);
 
-    for line in r.lines() {
+    for (i, line) in r.lines().enumerate() {
         let l: String = line?;
-        println!("{}", l);
-        println!("{:#?}", lex(&l));
+        let mut tokens: Vec<Vec<Token>> = Vec::new();
+        // for tokens_line in lex(&l, (i + 1) as u128) {
+        tokens.push(lex(&l, (i + 1) as u128));
+        // }
+        // println!("{}", l);
+        // println!("{:#?}", lex(&l, (i + 1) as u128));
     }
 
     Ok(())

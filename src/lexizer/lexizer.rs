@@ -53,7 +53,7 @@ fn lex_operator(lexeme: &str) -> bool {
     }
 }
 
-fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>) {
+fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>, line: u128) {
     if !buffer.is_empty() {
         let b = buffer.clone();
         tokens.push(Token {
@@ -66,12 +66,13 @@ fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>) {
                 _ => TokenType::INVALID,
             },
             lexeme: Some(b),
+            line: line,
         });
         buffer.clear();
     }
 }
 
-pub fn lex(line: &str) -> Vec<Token> {
+pub fn lex(line: &str, linenum: u128) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
     let chars: Vec<char> = line.chars().collect();
     let mut buffer = String::new();
@@ -82,22 +83,23 @@ pub fn lex(line: &str) -> Vec<Token> {
         i += 1;
 
         if c.is_whitespace() {
-            match_buffer(&mut buffer, &mut tokens);
+            match_buffer(&mut buffer, &mut tokens, linenum);
             continue;
         }
 
         // only works with 1 character operators
         if lex_operator(&c.to_string()) {
-            match_buffer(&mut buffer, &mut tokens);
+            match_buffer(&mut buffer, &mut tokens, linenum);
             tokens.push(Token {
                 t: TokenType::Operator,
                 lexeme: Some(c.to_string()),
+                line: linenum,
             });
             continue;
         }
 
         if c == '"' {
-            match_buffer(&mut buffer, &mut tokens);
+            match_buffer(&mut buffer, &mut tokens, linenum);
             let mut j = i;
             buffer.push(c);
             while j < chars.len() {
@@ -107,7 +109,7 @@ pub fn lex(line: &str) -> Vec<Token> {
                 }
                 j += 1;
             }
-            match_buffer(&mut buffer, &mut tokens);
+            match_buffer(&mut buffer, &mut tokens, linenum);
             i = j + 1;
             continue;
         }
@@ -115,6 +117,6 @@ pub fn lex(line: &str) -> Vec<Token> {
         buffer.push(c);
     }
 
-    match_buffer(&mut buffer, &mut tokens);
+    match_buffer(&mut buffer, &mut tokens, linenum);
     tokens
 }
