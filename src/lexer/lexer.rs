@@ -53,7 +53,7 @@ fn lex_operator(lexeme: &str) -> bool {
     }
 }
 
-fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>, line: u128) {
+fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>) {
     if !buffer.is_empty() {
         let b = buffer.clone();
         tokens.push(Token {
@@ -65,14 +65,13 @@ fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>, line: u128) {
                 string if lex_identifier(string) => TokenType::Identifier,
                 _ => TokenType::INVALID,
             },
-            lexeme: Some(b),
-            line: line,
+            lexeme: b,
         });
         buffer.clear();
     }
 }
 
-pub fn lex(line: &str, linenum: u128) -> Vec<Token> {
+pub fn lex(line: &str) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
     let chars: Vec<char> = line.chars().collect();
     let mut buffer = String::new();
@@ -83,23 +82,22 @@ pub fn lex(line: &str, linenum: u128) -> Vec<Token> {
         i += 1;
 
         if c.is_whitespace() {
-            match_buffer(&mut buffer, &mut tokens, linenum);
+            match_buffer(&mut buffer, &mut tokens);
             continue;
         }
 
         // only works with 1 character operators
         if lex_operator(&c.to_string()) {
-            match_buffer(&mut buffer, &mut tokens, linenum);
+            match_buffer(&mut buffer, &mut tokens);
             tokens.push(Token {
                 t: TokenType::Operator,
-                lexeme: Some(c.to_string()),
-                line: linenum,
+                lexeme: c.to_string(),
             });
             continue;
         }
 
         if c == '"' {
-            match_buffer(&mut buffer, &mut tokens, linenum);
+            match_buffer(&mut buffer, &mut tokens);
             let mut j = i;
             buffer.push(c);
             while j < chars.len() {
@@ -109,7 +107,7 @@ pub fn lex(line: &str, linenum: u128) -> Vec<Token> {
                 }
                 j += 1;
             }
-            match_buffer(&mut buffer, &mut tokens, linenum);
+            match_buffer(&mut buffer, &mut tokens);
             i = j + 1;
             continue;
         }
@@ -117,6 +115,6 @@ pub fn lex(line: &str, linenum: u128) -> Vec<Token> {
         buffer.push(c);
     }
 
-    match_buffer(&mut buffer, &mut tokens, linenum);
+    match_buffer(&mut buffer, &mut tokens);
     tokens
 }
