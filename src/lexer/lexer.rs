@@ -4,7 +4,7 @@ use regex::Regex;
 // use std::io;
 
 fn lex_keyword(lexeme: &str) -> bool {
-    let keywords = ["create", "use"];
+    let keywords = ["create", "meta", "component", "components", "view"];
     if keywords.contains(&lexeme) {
         return true;
     }
@@ -55,14 +55,24 @@ fn lex_operator(lexeme: &str) -> bool {
 
 fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>) {
     if !buffer.is_empty() {
-        let b = buffer.clone();
+        let mut b = buffer.clone();
         tokens.push(Token {
             t: match &b {
                 string if lex_keyword(string) => TokenType::Keyword,
-                string if lex_string(string) => TokenType::String,
+                string if lex_string(string) => {
+                    b.pop();
+                    b.remove(0);
+                    TokenType::String
+                }
                 string if lex_number(string) => TokenType::Number,
                 string if lex_operator(string) => TokenType::Operator,
                 string if lex_identifier(string) => TokenType::Identifier,
+                string if string == ";" => TokenType::Terminator,
+                string if string == "{" => TokenType::OpenBrace,
+                string if string == "}" => TokenType::CloseBrace,
+                string if string == "[" => TokenType::OpenBracket,
+                string if string == "]" => TokenType::CloseBracket,
+                string if string == "," => TokenType::Separator,
                 _ => TokenType::INVALID,
             },
             lexeme: b,
@@ -86,11 +96,36 @@ pub fn lex(line: &str) -> Vec<Token> {
             continue;
         }
 
+        if c == '/' && i < chars.len() && chars[i] == '/' {
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+            continue;
+        }
+
         // only works with 1 character operators
         if lex_operator(&c.to_string()) {
             match_buffer(&mut buffer, &mut tokens);
             tokens.push(Token {
                 t: TokenType::Operator,
+                lexeme: c.to_string(),
+            });
+            continue;
+        }
+
+        if c == ',' {
+            match_buffer(&mut buffer, &mut tokens);
+            tokens.push(Token {
+                t: TokenType::Separator,
+                lexeme: c.to_string(),
+            });
+            continue;
+        }
+
+        if c == ';' {
+            match_buffer(&mut buffer, &mut tokens);
+            tokens.push(Token {
+                t: TokenType::Terminator,
                 lexeme: c.to_string(),
             });
             continue;

@@ -1,2 +1,14 @@
-create text
-create text: a = "hello, world!"
+meta components;
+
+create component: text {
+    vars = ["text"];
+    default = "text";
+    html = "<p>{{text}}</p>";
+};
+
+meta view;
+
+create text; // <p></p>
+create text: a = "hello, world!"; // <p>hello, world!</p>
+create text: b; // <p>/<p>
+b.text = "hello, world!"; // changes b to <p>hello, world!</p>

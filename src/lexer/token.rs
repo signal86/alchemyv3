@@ -5,6 +5,13 @@ pub enum TokenType {
     String,
     Number,
     Operator,
+    Separator,
+    Terminator, // semicolon
+
+    OpenBrace,
+    CloseBrace,
+    OpenBracket,
+    CloseBracket,
 
     INVALID,
 }
