@@ -1,7 +1,8 @@
+use super::super::lexer::lexer::Lexer;
 use super::super::lexer::token::Token;
 use super::super::lexer::token::TokenType;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufReader, Error, ErrorKind};
 // use std::io;
 
 /*
@@ -115,6 +116,300 @@ pub struct ParserError {
     pub msg: String,
     pub line: u128,
 }
+
+/*
+Meta ->
+    Keyword("meta") MetaSet Terminator(";")
+
+MetaSet ->
+    Keyword("components")
+    | Keyword("view")
+*/
+
+// TODO: convert to expects
+#[allow(non_snake_case)]
+pub fn parse_MetaSet(lexer: &mut Lexer) -> Result<Meta, Error> {
+    match lexer.curr_token.t {
+        TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
+            "components" => {
+                lexer.consume_token();
+                Ok(Meta::Components)
+            }
+            "view" => {
+                lexer.consume_token();
+                Ok(Meta::View)
+            }
+            _ => Err(Error::new(ErrorKind::Other, "bad keyword")),
+        },
+        _ => Err(Error::new(ErrorKind::Other, "not a keyword")),
+    }
+    // if lexer.curr_token.t == TokenType::Keyword && lexer.curr_token.lexeme == "components" {
+    //     Ok(Meta::Components)
+    // } else if lexer.curr_token.t == TokenType::Keyword && lexer.curr_token.lexeme == "view" {
+    //     Ok(Meta::View)
+    // } else {
+    //     Err(Error::new(ErrorKind::Other, "INVALID"))?
+    // }
+}
+
+// TODO: convert to expects
+#[allow(non_snake_case)]
+pub fn parse_Meta(lexer: &mut Lexer) -> Result<Meta, Error> {
+    match lexer.curr_token.t {
+        TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
+            "meta" => {
+                lexer.consume_token();
+                match parse_MetaSet(lexer) {
+                    Ok(s) => match lexer.curr_token.t {
+                        TokenType::Terminator => {
+                            lexer.consume_token();
+                            Ok(s)
+                        }
+                        _ => Err(Error::new(ErrorKind::Other, "terminator not found")),
+                    },
+                    Err(E) => Err(E),
+                }
+            }
+            _ => Err(Error::new(ErrorKind::Other, "bad keyword")),
+        },
+        _ => Err(Error::new(ErrorKind::Other, "not a keyword")),
+    }
+}
+
+/*
+ComponentDefinition ->
+    Keyword("create") Keyword("component") Operator(":") Identifier(*) OpenBrace("{") ComponentBody CloseBrace("}") Terminator(";")
+
+ComponentBody ->
+    ComponentProperties*
+
+ComponentProperties ->
+    VarsP
+    | DefaultP
+    | HtmlTemplateP
+    | CssTemplateP
+    | JSTemplateP
+*/
+
+fn expect_token(lexer: &Lexer, t: TokenType) -> Result<(), Error> {
+    match lexer.curr_token.t {
+        comp if comp == t => Ok(()),
+        _ => Err(Error::new(
+            ErrorKind::Other,
+            format!("expected token type {:?}", t),
+        )),
+    }
+}
+
+fn expect(lexer: &Lexer, t: TokenType, lexeme: &str) -> Result<(), Error> {
+    expect_token(lexer, t)?;
+    match lexer.curr_token.lexeme.as_str() {
+        comp if comp == lexeme => Ok(()),
+        _ => Err(Error::new(
+            ErrorKind::Other,
+            format!("expected value {}", lexeme),
+        )),
+    }
+}
+
+#[allow(non_snake_case)]
+pub fn parse_StrList(lexer: &mut Lexer) -> Result<Vec<String>, Error> {
+    let mut strs: Vec<String> = Vec::new();
+    expect_token(lexer, TokenType::String)?;
+    strs.push(lexer.curr_token.lexeme.clone());
+    lexer.consume_token();
+    if lexer.curr_token.t == TokenType::Operator && lexer.curr_token.lexeme == "," {
+        lexer.consume_token();
+        let mut ext = parse_StrList(lexer)?;
+        strs.append(&mut ext);
+    }
+    Ok(strs)
+}
+
+#[allow(non_snake_case)]
+pub fn parse_VarsP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {
+    expect(lexer, TokenType::Identifier, "vars")?;
+    lexer.consume_token();
+    expect(lexer, TokenType::Operator, "=")?;
+    lexer.consume_token();
+    expect_token(lexer, TokenType::OpenBracket)?;
+    lexer.consume_token();
+    let strs: Vec<String> = parse_StrList(lexer)?;
+    expect_token(lexer, TokenType::CloseBracket)?;
+    lexer.consume_token();
+    expect_token(lexer, TokenType::Terminator)?;
+    lexer.consume_token();
+
+    def.vars.extend(strs);
+
+    Ok(())
+}
+
+#[allow(non_snake_case)]
+fn parse_Template(lexer: &mut Lexer, mutator: &mut Option<String>) -> Result<(), Error> {
+    lexer.consume_token();
+
+    expect(lexer, TokenType::Operator, "=")?;
+    lexer.consume_token();
+    expect_token(lexer, TokenType::String)?;
+    *mutator = Some(lexer.curr_token.lexeme.clone());
+    lexer.consume_token();
+    expect_token(lexer, TokenType::Terminator)?;
+    lexer.consume_token();
+
+    Ok(())
+}
+
+// #[allow(non_snake_case)]
+// fn parse_HtmlTemplateP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {}
+//
+// #[allow(non_snake_case)]
+// fn parse_CssTemplateP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {}
+//
+// #[allow(non_snake_case)]
+// fn parse_JSTemplateP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {}
+
+#[allow(non_snake_case)]
+pub fn parse_ComponentProperty(
+    lexer: &mut Lexer,
+    def: &mut ComponentDefinition,
+) -> Result<(), Error> {
+    expect_token(lexer, TokenType::Identifier)?;
+    match lexer.curr_token.lexeme.as_str() {
+        "vars" => parse_VarsP(lexer, def),
+        "default" => parse_Template(lexer, &mut def.default_var),
+        "html" => parse_Template(lexer, &mut def.html),
+        "css" => parse_Template(lexer, &mut def.css),
+        "js" => parse_Template(lexer, &mut def.js),
+        _ => Err(Error::new(ErrorKind::Other, "invalid property")),
+    }
+}
+
+#[allow(non_snake_case)]
+pub fn parse_ComponentBody(lexer: &mut Lexer, n: String) -> Result<ComponentDefinition, Error> {
+    let mut def = ComponentDefinition {
+        name: n,
+        vars: Vec::new(),
+        default_var: None,
+        html: None,
+        css: None,
+        js: None,
+    };
+
+    while lexer.curr_token.t != TokenType::CloseBrace {
+        parse_ComponentProperty(lexer, &mut def)?;
+    }
+
+    Ok(def)
+}
+
+#[allow(non_snake_case)]
+fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinition, Error> {
+    expect(lexer, TokenType::Keyword, "create")?;
+    lexer.consume_token();
+    expect(lexer, TokenType::Keyword, "component")?;
+    lexer.consume_token();
+    expect(lexer, TokenType::Operator, ":")?;
+    lexer.consume_token();
+    expect_token(lexer, TokenType::Identifier)?;
+    let name = lexer.curr_token.lexeme.clone();
+    lexer.consume_token();
+    expect_token(lexer, TokenType::OpenBrace)?;
+    lexer.consume_token();
+    let def = parse_ComponentBody(lexer, name)?;
+    expect_token(lexer, TokenType::CloseBrace)?;
+    lexer.consume_token();
+    expect_token(lexer, TokenType::Terminator)?;
+    lexer.consume_token();
+    Ok(def)
+}
+
+// Wtf am i doing bro
+/*
+#[allow(non_snake_case)]
+pub fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinition, Error> {
+    match lexer.curr_token.t {
+        TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
+            "create" => {
+                lexer.consume_token();
+                // keyword(component)
+                match lexer.curr_token.t {
+                    TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
+                        "component" => {
+                            lexer.consume_token();
+                            // Operator
+                            match lexer.curr_token.t {
+                                TokenType::Operator => match lexer.curr_token.lexeme.as_str() {
+                                    ":" => {
+                                        lexer.consume_token();
+                                        // component name (Identifier)
+                                        match lexer.curr_token.t {
+                                            TokenType::Identifier => {
+                                                let n = lexer.curr_token.lexeme.clone();
+                                                lexer.consume_token();
+                                                // block
+                                                match lexer.curr_token.t {
+                                                    TokenType::OpenBrace => {
+                                                        lexer.consume_token();
+                                                        match parse_ComponentBody(lexer, n) {
+                                                            Ok(s) => match lexer.curr_token.t {
+                                                                TokenType::CloseBrace => {
+                                                                    lexer.consume_token();
+                                                                    match lexer.curr_token.t {
+                                                                        TokenType::Terminator => {
+                                                                            lexer.consume_token();
+                                                                            // let mut def = ComponentDefinition {
+                                                                            //     name: n,
+                                                                            //     vars: Vec::new(),
+                                                                            //     default_var: None,
+                                                                            //     html: None,
+                                                                            //     css: None,
+                                                                            //     js: None,
+                                                                            // };
+                                                                            Ok(s)
+                                                                        }
+                                                                        _ => Err(Error::new(
+                                                                            ErrorKind::Other,
+                                                                            "unterminated",
+                                                                        )),
+                                                                    }
+                                                                }
+                                                                _ => Err(Error::new(
+                                                                    ErrorKind::Other,
+                                                                    "not a block",
+                                                                )),
+                                                            },
+                                                            Err(E) => Err(E),
+                                                        }
+                                                    }
+                                                    _ => Err(Error::new(
+                                                        ErrorKind::Other,
+                                                        "not a block",
+                                                    )),
+                                                }
+                                            }
+                                            _ => Err(Error::new(
+                                                ErrorKind::Other,
+                                                "not a identifier",
+                                            )),
+                                        }
+                                    }
+                                    _ => Err(Error::new(ErrorKind::Other, "expected ':'")),
+                                },
+                                _ => Err(Error::new(ErrorKind::Other, "not a operator")),
+                            }
+                        }
+                        _ => Err(Error::new(ErrorKind::Other, "expected 'component'")),
+                    },
+                    _ => Err(Error::new(ErrorKind::Other, "not a keyword")),
+                }
+            }
+            _ => Err(Error::new(ErrorKind::Other, "expected 'create'")),
+        },
+        _ => Err(Error::new(ErrorKind::Other, "not a keyword")),
+    }
+}
+*/
 
 pub fn parse_file(file: &File) -> Result<AST, Vec<ParserError>> {
     let mut ast = AST { nodes: Vec::new() };

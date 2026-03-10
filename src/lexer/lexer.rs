@@ -1,6 +1,8 @@
 use super::token::Token;
 use super::token::TokenType;
 use regex::Regex;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 // use std::io;
 
 fn lex_keyword(lexeme: &str) -> bool {
@@ -46,6 +48,7 @@ fn lex_operator(lexeme: &str) -> bool {
         "=" => true,
         "+" => true,
         "-" => true,
+        "*" => true,
         "/" => true,
         "." => true,
         ":" => true,
@@ -81,7 +84,22 @@ fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>) {
     }
 }
 
-pub fn lex(line: &str) -> Vec<Token> {
+#[derive(Debug, Clone)]
+pub struct Lexer {
+    pub curr_token: Token,
+    // pub reader: &BufReader<&File>,
+}
+
+impl Lexer {
+    pub fn consume_token(&self) {
+        // next_token(self.reader);
+        // TEMP
+        next_token("");
+    }
+}
+
+// TODO: make work
+pub fn next_token(line: &str) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
     let chars: Vec<char> = line.chars().collect();
     let mut buffer = String::new();
