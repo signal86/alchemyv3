@@ -78,7 +78,7 @@ pub enum ASTNode {
     Meta(Meta),
     ComponentDefinition(ComponentDefinition),
     ComponentInstance(ComponentInstance),
-    Assingment(Assignment),
+    Assignment(Assignment),
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +117,56 @@ pub struct AST {
 }
 
 /*
+Node ->
+    Meta
+    | ComponentDefinition
+    | ComponentInstance
+    | Assignment
+
+Meta ->
+    Keyword("meta") MetaSet Terminator(";")
+
+ComponentDefinition ->
+    Keyword("create") Keyword("component") Operator(":") Identifier(*) OpenBrace("{") ComponentBody CloseBrace("}") Terminator(";")
+
+ComponentInstance ->
+    Keyword("create") Identifier(*) Terminator(";")
+
+Assignment ->
+    Identifier(*) ...
+*/
+
+#[allow(non_snake_case)]
+fn parse_Node(lexer: &mut Lexer) -> Result<ASTNode, Error> {
+    match lexer.curr_token.t {
+        TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
+            "meta" => Ok(ASTNode::Meta(parse_Meta(lexer)?)),
+            "create" => {
+                lexer.consume_token();
+                match lexer.curr_token.t {
+                    TokenType::Keyword => {
+                        if lexer.curr_token.lexeme.as_str() == "component" {
+                            Ok(ASTNode::ComponentDefinition(parse_ComponentDefinition(
+                                lexer,
+                            )?))
+                        } else {
+                            Err(Error::new(ErrorKind::Other, "invalid node"))
+                        }
+                    }
+                    TokenType::Identifier => {
+                        Ok(ASTNode::ComponentInstance(parse_ComponentInstance(lexer)?))
+                    }
+                    _ => Err(Error::new(ErrorKind::Other, "invalid node")),
+                }
+            }
+            _ => Err(Error::new(ErrorKind::Other, "invalid node")),
+        },
+        TokenType::Identifier => Ok(ASTNode::Assignment(parse_Assignment(lexer)?)),
+        _ => Err(Error::new(ErrorKind::Other, "invalid node")),
+    }
+}
+
+/*
 Meta ->
     Keyword("meta") MetaSet Terminator(";")
 
@@ -126,7 +176,7 @@ MetaSet ->
 */
 
 #[allow(non_snake_case)]
-pub fn parse_MetaSet(lexer: &mut Lexer) -> Result<Meta, Error> {
+fn parse_MetaSet(lexer: &mut Lexer) -> Result<Meta, Error> {
     expect_token(lexer, TokenType::Keyword)?;
     match lexer.curr_token.lexeme.as_str() {
         "components" => {
@@ -150,7 +200,7 @@ pub fn parse_MetaSet(lexer: &mut Lexer) -> Result<Meta, Error> {
 }
 
 #[allow(non_snake_case)]
-pub fn parse_Meta(lexer: &mut Lexer) -> Result<Meta, Error> {
+fn parse_Meta(lexer: &mut Lexer) -> Result<Meta, Error> {
     expect(lexer, TokenType::Keyword, "meta")?;
     lexer.consume_token();
     let s = parse_MetaSet(lexer)?;
@@ -215,7 +265,7 @@ fn expect(lexer: &Lexer, t: TokenType, lexeme: &str) -> Result<(), Error> {
 }
 
 #[allow(non_snake_case)]
-pub fn parse_StrList(lexer: &mut Lexer) -> Result<Vec<String>, Error> {
+fn parse_StrList(lexer: &mut Lexer) -> Result<Vec<String>, Error> {
     let mut strs: Vec<String> = Vec::new();
     expect_token(lexer, TokenType::String)?;
     strs.push(lexer.curr_token.lexeme.clone());
@@ -229,7 +279,7 @@ pub fn parse_StrList(lexer: &mut Lexer) -> Result<Vec<String>, Error> {
 }
 
 #[allow(non_snake_case)]
-pub fn parse_VarsP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {
+fn parse_VarsP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {
     expect(lexer, TokenType::Identifier, "vars")?;
     lexer.consume_token();
     expect(lexer, TokenType::Operator, "=")?;
@@ -272,10 +322,7 @@ fn parse_Template(lexer: &mut Lexer, mutator: &mut Option<String>) -> Result<(),
 // fn parse_JSTemplateP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {}
 
 #[allow(non_snake_case)]
-pub fn parse_ComponentProperty(
-    lexer: &mut Lexer,
-    def: &mut ComponentDefinition,
-) -> Result<(), Error> {
+fn parse_ComponentProperty(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {
     expect_token(lexer, TokenType::Identifier)?;
     match lexer.curr_token.lexeme.as_str() {
         "vars" => parse_VarsP(lexer, def),
@@ -288,7 +335,7 @@ pub fn parse_ComponentProperty(
 }
 
 #[allow(non_snake_case)]
-pub fn parse_ComponentBody(lexer: &mut Lexer, n: String) -> Result<ComponentDefinition, Error> {
+fn parse_ComponentBody(lexer: &mut Lexer, n: String) -> Result<ComponentDefinition, Error> {
     let mut def = ComponentDefinition {
         name: n,
         vars: Vec::new(),
@@ -307,8 +354,8 @@ pub fn parse_ComponentBody(lexer: &mut Lexer, n: String) -> Result<ComponentDefi
 
 #[allow(non_snake_case)]
 fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinition, Error> {
-    expect(lexer, TokenType::Keyword, "create")?;
-    lexer.consume_token();
+    // expect(lexer, TokenType::Keyword, "create")?;
+    // lexer.consume_token();
     expect(lexer, TokenType::Keyword, "component")?;
     lexer.consume_token();
     expect(lexer, TokenType::Operator, ":")?;
@@ -335,17 +382,17 @@ ComponentInstance ->
 
 #[allow(non_snake_case)]
 fn parse_ComponentInstance(lexer: &mut Lexer) -> Result<ComponentInstance, Error> {
-    expect(lexer, TokenType::Keyword, "create")?;
-    lexer.consume_token();
+    // expect(lexer, TokenType::Keyword, "create")?;
+    // lexer.consume_token();
     expect_token(lexer, TokenType::Identifier)?;
-    let component = lexer.curr_token.lexeme;
     let mut inst = ComponentInstance {
-        component: component,
+        component: lexer.curr_token.lexeme.clone(),
         identifier: None,
         value: None,
     };
     lexer.consume_token();
     match lexer.curr_token.t {
+        // Rule 1
         TokenType::Terminator => {
             lexer.consume_token();
             Ok(inst.clone())
@@ -354,7 +401,27 @@ fn parse_ComponentInstance(lexer: &mut Lexer) -> Result<ComponentInstance, Error
             expect(lexer, TokenType::Operator, ":")?;
             lexer.consume_token();
             expect_token(lexer, TokenType::Identifier)?;
-            inst.name = lexer.curr_token.lexeme;
+            inst.identifier = Some(lexer.curr_token.lexeme.clone());
+            lexer.consume_token();
+            match lexer.curr_token.t {
+                // Rule 2
+                TokenType::Terminator => {
+                    lexer.consume_token();
+                    Ok(inst.clone())
+                }
+                // Rule 3
+                TokenType::Operator => {
+                    expect(lexer, TokenType::Operator, "=")?;
+                    lexer.consume_token();
+                    expect_token(lexer, TokenType::String)?;
+                    inst.value = Some(lexer.curr_token.lexeme.clone());
+                    lexer.consume_token();
+                    expect_token(lexer, TokenType::Terminator)?;
+                    lexer.consume_token();
+                    Ok(inst.clone())
+                }
+                _ => Err(Error::new(ErrorKind::Other, "invalid component instance")),
+            }
         }
         _ => Err(Error::new(ErrorKind::Other, "invalid component instance")),
     }
@@ -364,6 +431,30 @@ fn parse_ComponentInstance(lexer: &mut Lexer) -> Result<ComponentInstance, Error
 Assignment ->
     Identifier(*) Operator(".") Identifier(*) Operator("=") String(*) Terminator(";")
 */
+
+#[allow(non_snake_case)]
+fn parse_Assignment(lexer: &mut Lexer) -> Result<Assignment, Error> {
+    expect_token(lexer, TokenType::Identifier)?;
+    let mut assignment = Assignment {
+        component_identifier: lexer.curr_token.lexeme.clone(),
+        field: String::from(""),
+        value: String::from(""),
+    };
+    lexer.consume_token();
+    expect(lexer, TokenType::Operator, ".")?;
+    lexer.consume_token();
+    expect_token(lexer, TokenType::Identifier)?;
+    assignment.field = lexer.curr_token.lexeme.clone();
+    lexer.consume_token();
+    expect(lexer, TokenType::Operator, "=")?;
+    lexer.consume_token();
+    expect_token(lexer, TokenType::String)?;
+    assignment.value = lexer.curr_token.lexeme.clone();
+    lexer.consume_token();
+    expect_token(lexer, TokenType::Terminator)?;
+    lexer.consume_token();
+    Ok(assignment)
+}
 
 // Wtf am i doing bro
 /*
