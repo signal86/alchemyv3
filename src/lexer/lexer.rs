@@ -2,7 +2,8 @@ use super::token::Token;
 use super::token::TokenType;
 use regex::Regex;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::BufReader;
+use std::io::Read;
 // use std::io;
 
 fn lex_keyword(lexeme: &str) -> bool {
@@ -56,10 +57,10 @@ fn lex_operator(lexeme: &str) -> bool {
     }
 }
 
-fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>) {
+fn match_buffer(buffer: &mut String) -> Token {
     if !buffer.is_empty() {
         let mut b = buffer.clone();
-        tokens.push(Token {
+        let t = Token {
             t: match &b {
                 string if lex_keyword(string) => TokenType::Keyword,
                 string if lex_string(string) => {
@@ -79,22 +80,115 @@ fn match_buffer(buffer: &mut String, tokens: &mut Vec<Token>) {
                 _ => TokenType::INVALID,
             },
             lexeme: b,
-        });
+        };
         buffer.clear();
+        return t;
+    }
+    Token {
+        t: TokenType::INVALID,
+        lexeme: "".to_string(),
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Lexer {
     pub curr_token: Token,
-    // pub reader: &BufReader<&File>,
+    reader: BufReader<File>,
+    pub line: u128,
 }
 
 impl Lexer {
-    pub fn consume_token(&self) {
-        // next_token(self.reader);
-        // TEMP
-        next_token("");
+    pub fn new(file: File) -> Self {
+        Lexer {
+            curr_token: Token {
+                t: TokenType::EOF,
+                lexeme: "".to_string(),
+            },
+            reader: BufReader::new(file),
+            line: 0,
+        }
+    }
+
+    pub fn consume_token(&mut self) -> Token {
+        // let mut buffer: Vec<char> = Vec::new();
+        let mut reader_buffer = [0; 1];
+        let mut buffer = String::new();
+        loop {
+            let read = self.reader.read(&mut reader_buffer).unwrap();
+            if read == 0 {
+                return match_buffer(&mut buffer);
+            }
+
+            let c = reader_buffer[0] as char;
+
+            if c.is_whitespace() {
+                return match_buffer(&mut buffer);
+            }
+
+            // if c == '/' && i < chars.len() && chars[i] == '/' {
+            //     while i < chars.len() && chars[i] != '\n' {
+            //         i += 1;
+            //     }
+            //     continue;
+            // }
+
+            if c == '#' {
+                loop {
+                    let mut void = [0; 1];
+                    let read = self.reader.read(&mut void).unwrap();
+                    if read == 0 || read[0] as char == '\n' {
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            // only works with 1 character operators
+            if lex_operator(&c.to_string()) {
+                match_buffer(&mut buffer, &mut tokens);
+                tokens.push(Token {
+                    t: TokenType::Operator,
+                    lexeme: c.to_string(),
+                });
+                continue;
+            }
+
+            if c == ',' {
+                match_buffer(&mut buffer, &mut tokens);
+                tokens.push(Token {
+                    t: TokenType::Separator,
+                    lexeme: c.to_string(),
+                });
+                continue;
+            }
+
+            if c == ';' {
+                match_buffer(&mut buffer, &mut tokens);
+                tokens.push(Token {
+                    t: TokenType::Terminator,
+                    lexeme: c.to_string(),
+                });
+                continue;
+            }
+
+            if c == '"' {
+                match_buffer(&mut buffer, &mut tokens);
+                let mut j = i;
+                buffer.push(c);
+                while j < chars.len() {
+                    buffer.push(chars[j]);
+                    if chars[j] == '"' && chars[j - 1] != '\\' {
+                        break;
+                    }
+                    j += 1;
+                }
+                match_buffer(&mut buffer, &mut tokens);
+                i = j + 1;
+                continue;
+            }
+
+            buffer.push(c);
+        }
     }
 }
 

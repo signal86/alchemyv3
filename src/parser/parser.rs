@@ -543,13 +543,12 @@ pub fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinitio
 }
 */
 
-pub fn parse_file(file: &File) -> Result<AST, Vec<ParserError>> {
+pub fn parse_file(file: &File) -> Option<AST> {
     let mut ast = AST { nodes: Vec::new() };
-    let mut errors: Vec<ParserError> = Vec::new();
 
-    let r = BufReader::new(file);
+    //
 
-    Ok(ast)
+    Some(ast)
 }
 
 fn parse_statement(ctx: &[String], statement: Vec<Token>) -> Option<String> {
@@ -566,6 +565,7 @@ fn parse_statement(ctx: &[String], statement: Vec<Token>) -> Option<String> {
             TokenType::CloseBrace => {}
             TokenType::OpenBracket => {}
             TokenType::CloseBracket => {}
+            TokenType::EOF => {}
             TokenType::INVALID => {}
         }
     }

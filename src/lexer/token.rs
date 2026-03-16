@@ -13,6 +13,8 @@ pub enum TokenType {
     OpenBracket,
     CloseBracket,
 
+    EOF,
+
     INVALID,
 }
 
