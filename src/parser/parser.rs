@@ -8,6 +8,7 @@ use std::io::{BufReader, Error, ErrorKind};
 /*
 CFG
 
+Done
 Node ->
     Meta
     | ComponentDefinition
@@ -64,11 +65,13 @@ Done
 JSTemplateP ->
     Identifier("js") Operator("=") String(*) Terminator(";")
 
+Done
 ComponentInstance ->
     Keyword("create") Identifier(*) Terminator(";")
     | Keyword("create") Identifier(*) Operator(":") Identifier(*) Terminator(";")
     | Keyword("create") Identifier(*) Operator(":") Identifier(*) Operator("=") String(*) Terminator(";")
 
+Done
 Assignment ->
     Identifier(*) Operator(".") Identifier(*) Operator("=") String(*) Terminator(";")
 */
@@ -150,19 +153,25 @@ fn parse_Node(lexer: &mut Lexer) -> Result<ASTNode, Error> {
                                 lexer,
                             )?))
                         } else {
-                            Err(Error::new(ErrorKind::Other, "invalid node"))
+                            Err(Error::new(
+                                ErrorKind::Other,
+                                "invalid node (component definition)",
+                            ))
                         }
                     }
                     TokenType::Identifier => {
                         Ok(ASTNode::ComponentInstance(parse_ComponentInstance(lexer)?))
                     }
-                    _ => Err(Error::new(ErrorKind::Other, "invalid node")),
+                    _ => Err(Error::new(
+                        ErrorKind::Other,
+                        "invalid node (component definition vs instance)",
+                    )),
                 }
             }
-            _ => Err(Error::new(ErrorKind::Other, "invalid node")),
+            _ => Err(Error::new(ErrorKind::Other, "invalid node (keyword)")),
         },
         TokenType::Identifier => Ok(ASTNode::Assignment(parse_Assignment(lexer)?)),
-        _ => Err(Error::new(ErrorKind::Other, "invalid node")),
+        _ => Err(Error::new(ErrorKind::Other, "invalid node (non-node)")),
     }
 }
 
@@ -205,6 +214,7 @@ fn parse_Meta(lexer: &mut Lexer) -> Result<Meta, Error> {
     lexer.consume_token();
     let s = parse_MetaSet(lexer)?;
     expect_token(lexer, TokenType::Terminator)?;
+    lexer.consume_token();
     Ok(s)
 
     // match lexer.curr_token.t {
@@ -543,31 +553,53 @@ pub fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinitio
 }
 */
 
-pub fn parse_file(file: &File) -> Option<AST> {
+pub fn parse_file(file: File) -> Option<AST> {
     let mut ast = AST { nodes: Vec::new() };
+    let mut errors: Vec<Error> = Vec::new();
 
-    //
-
-    Some(ast)
-}
-
-fn parse_statement(ctx: &[String], statement: Vec<Token>) -> Option<String> {
-    for token in statement {
-        match token.t {
-            TokenType::Keyword => {}
-            TokenType::Identifier => {}
-            TokenType::String => {}
-            TokenType::Number => {}
-            TokenType::Separator => {}
-            TokenType::Operator => {}
-            TokenType::Terminator => {}
-            TokenType::OpenBrace => {}
-            TokenType::CloseBrace => {}
-            TokenType::OpenBracket => {}
-            TokenType::CloseBracket => {}
-            TokenType::EOF => {}
-            TokenType::INVALID => {}
+    let mut lexer = Lexer::new(file);
+    // ast.nodes.push(parse_Node(&mut lexer));
+    lexer.consume_token();
+    // lexer.curr_token.t = TokenType::INVALID;
+    while lexer.curr_token.t != TokenType::EOF {
+        // for _ in 0..2 {
+        let node = parse_Node(&mut lexer);
+        println!("{:#?}", node);
+        match node {
+            Ok(s) => {
+                ast.nodes.push(s);
+            }
+            Err(e) => {
+                errors.push(e);
+            }
         }
     }
-    return None;
+
+    if errors.is_empty() {
+        Some(ast)
+    } else {
+        println!("{:#?}", errors);
+        None
+    }
 }
+
+// fn parse_statement(ctx: &[String], statement: Vec<Token>) -> Option<String> {
+//     for token in statement {
+//         match token.t {
+//             TokenType::Keyword => {}
+//             TokenType::Identifier => {}
+//             TokenType::String => {}
+//             TokenType::Number => {}
+//             TokenType::Separator => {}
+//             TokenType::Operator => {}
+//             TokenType::Terminator => {}
+//             TokenType::OpenBrace => {}
+//             TokenType::CloseBrace => {}
+//             TokenType::OpenBracket => {}
+//             TokenType::CloseBracket => {}
+//             TokenType::EOF => {}
+//             TokenType::INVALID => {}
+//         }
+//     }
+//     return None;
+// }

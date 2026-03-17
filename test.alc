@@ -8,7 +8,7 @@ create component: text {
 
 meta view;
 
-create text; // <p></p>
-create text: a = "hello, world!"; // <p>hello, world!</p>
-create text: b; // <p>/<p>
-b.text = "hello, world!"; // changes b to <p>hello, world!</p>
+create text; # <p></p>
+create text: a = "hello, world!"; # <p>hello, world!</p>
+create text: b; # <p>/<p>
+b.text = "hello, world!"; # changes b to <p>hello, world!</p>

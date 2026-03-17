@@ -13,10 +13,10 @@ fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         eprintln!("alchemy <file>");
-        Err(io::Error::new(
+        return Err(io::Error::new(
             io::ErrorKind::Other,
             "no parameters supplied",
-        ))?;
+        ));
     }
 
     // for (i, arg) in args.iter().enumerate() {
@@ -25,7 +25,11 @@ fn main() -> io::Result<()> {
 
     let fname = &args[1];
     let file = File::open(fname)?;
-    parse_file(&file);
+    let parse_tree = parse_file(file);
+    match parse_tree {
+        Some(s) => println!("{:#?}", s),
+        None => return Err(io::Error::new(io::ErrorKind::Other, "parse failed")),
+    }
 
     // let r = BufReader::new(file);
     // for (_, line) in r.lines().enumerate() {
