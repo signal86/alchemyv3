@@ -158,6 +158,10 @@ impl Lexer {
                 self.pushback = None;
             }
 
+            if c == '\n' {
+                self.line += 1;
+            }
+
             if c.is_whitespace() {
                 match match_buffer(&mut buffer) {
                     Some(s) => return s,

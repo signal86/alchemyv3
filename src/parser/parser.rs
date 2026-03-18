@@ -1,6 +1,7 @@
 use super::super::lexer::lexer::Lexer;
 use super::super::lexer::token::Token;
 use super::super::lexer::token::TokenType;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind};
 // use std::io;
@@ -104,7 +105,8 @@ pub struct ComponentDefinition {
 pub struct ComponentInstance {
     pub component: String,
     pub identifier: Option<String>,
-    pub value: Option<String>,
+    pub default: Option<String>,
+    // pub fields: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -398,7 +400,8 @@ fn parse_ComponentInstance(lexer: &mut Lexer) -> Result<ComponentInstance, Error
     let mut inst = ComponentInstance {
         component: lexer.curr_token.lexeme.clone(),
         identifier: None,
-        value: None,
+        // fields: HashMap::new(),
+        default: None,
     };
     lexer.consume_token();
     match lexer.curr_token.t {
@@ -424,7 +427,13 @@ fn parse_ComponentInstance(lexer: &mut Lexer) -> Result<ComponentInstance, Error
                     expect(lexer, TokenType::Operator, "=")?;
                     lexer.consume_token();
                     expect_token(lexer, TokenType::String)?;
-                    inst.value = Some(lexer.curr_token.lexeme.clone());
+                    // oops, this doesnt guarantee the definition, so i cant actually scan that
+                    // until actually doing analysis
+                    // inst.fields.insert(
+                    //     inst.identifier.clone().unwrap(),
+                    //     lexer.curr_token.lexeme.clone(),
+                    // );
+                    inst.default = Some(lexer.curr_token.lexeme.clone());
                     lexer.consume_token();
                     expect_token(lexer, TokenType::Terminator)?;
                     lexer.consume_token();
@@ -571,6 +580,7 @@ pub fn parse_file(file: File) -> Option<AST> {
             }
             Err(e) => {
                 errors.push(e);
+                lexer.consume_token();
             }
         }
     }
@@ -578,7 +588,7 @@ pub fn parse_file(file: File) -> Option<AST> {
     if errors.is_empty() {
         Some(ast)
     } else {
-        println!("{:#?}", errors);
+        // println!("{:#?}", errors);
         None
     }
 }
