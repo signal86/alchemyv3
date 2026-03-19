@@ -564,7 +564,7 @@ pub fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinitio
 
 pub fn parse_file(file: File) -> Option<AST> {
     let mut ast = AST { nodes: Vec::new() };
-    let mut errors: Vec<Error> = Vec::new();
+    let mut errors: Vec<(Error, u128)> = Vec::new();
 
     let mut lexer = Lexer::new(file);
     // ast.nodes.push(parse_Node(&mut lexer));
@@ -579,7 +579,7 @@ pub fn parse_file(file: File) -> Option<AST> {
                 ast.nodes.push(s);
             }
             Err(e) => {
-                errors.push(e);
+                errors.push((e, lexer.line));
                 lexer.consume_token();
             }
         }
@@ -589,6 +589,9 @@ pub fn parse_file(file: File) -> Option<AST> {
         Some(ast)
     } else {
         // println!("{:#?}", errors);
+        for i in errors.iter() {
+            println!("line {}: {}", i.1, i.0);
+        }
         None
     }
 }

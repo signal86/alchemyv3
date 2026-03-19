@@ -107,7 +107,7 @@ impl Lexer {
             reader: BufReader::new(file),
             pushback: None,
             eof: false,
-            line: 0,
+            line: 1,
         }
     }
 
