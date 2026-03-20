@@ -1,261 +1,35 @@
-use super::super::lexer::lexer::Lexer;
-use super::super::lexer::token::Token;
-use super::super::lexer::token::TokenType;
+use super::semantic::*;
+use super::syntax::*;
+use crate::lexer::lexer::Lexer;
+use crate::lexer::token::TokenType;
+
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind};
+use std::io::{Error, ErrorKind};
 // use std::io;
 
-/*
-CFG
-
-Done
-Node ->
-    Meta
-    | ComponentDefinition
-    | ComponentInstance
-    | Assignment
-
-Done
-Meta ->
-    Keyword("meta") MetaSet Terminator(";")
-
-Done
-MetaSet ->
-    Keyword("components")
-    | Keyword("view")
-
-Done
-ComponentDefinition ->
-    Keyword("create") Keyword("component") Operator(":") Identifier(*) OpenBrace("{") ComponentBody CloseBrace("}") Terminator(";")
-
-Done
-ComponentBody ->
-    ComponentProperties*
-
-Done
-ComponentProperties ->
-    VarsP
-    | DefaultP
-    | HtmlTemplateP
-    | CssTemplateP
-    | JSTemplateP
-
-Done
-VarsP ->
-    Identifier("vars") Operator("=") OpenBracket("[") StrList CloseBracket["]"] Terminator(";")
-
-Done
-StrList ->
-    String(*)
-    | String(*) Separator(",") StrList
-
-Done
-DefaultP ->
-    Identifier("default") Operator("=") String(*) Terminator(";")
-
-Done
-HtmlTemplateP ->
-    Identifier("html") Operator("=") String(*) Terminator(";")
-
-Done
-CssTemplateP ->
-    Identifier("css") Operator("=") String(*) Terminator(";")
-
-Done
-JSTemplateP ->
-    Identifier("js") Operator("=") String(*) Terminator(";")
-
-Done
-ComponentInstance ->
-    Keyword("create") Identifier(*) Terminator(";")
-    | Keyword("create") Identifier(*) Operator(":") Identifier(*) Terminator(";")
-    | Keyword("create") Identifier(*) Operator(":") Identifier(*) Operator("=") String(*) Terminator(";")
-
-Done
-Assignment ->
-    Identifier(*) Operator(".") Identifier(*) Operator("=") String(*) Terminator(";")
-*/
-
-#[derive(Debug, Clone)]
-pub enum ASTNode {
-    Meta(Meta),
-    ComponentDefinition(ComponentDefinition),
-    ComponentInstance(ComponentInstance),
-    Assignment(Assignment),
-}
-
-#[derive(Debug, Clone)]
-pub enum Meta {
-    Components,
-    View,
-}
-
-#[derive(Debug, Clone)]
-pub struct ComponentDefinition {
-    pub name: String,
-    pub vars: Vec<String>,
-    pub default_var: Option<String>,
-    pub html: Option<String>, // template
-    pub css: Option<String>,  // template too
-    pub js: Option<String>,   // template too too
-}
-
-#[derive(Debug, Clone)]
-pub struct ComponentInstance {
-    pub component: String,
-    pub identifier: Option<String>,
-    pub default: Option<String>,
-    // pub fields: HashMap<String, String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Assignment {
-    pub component_identifier: String,
-    pub field: String,
-    pub value: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct AST {
-    pub nodes: Vec<ASTNode>,
-}
-
-/*
-Node ->
-    Meta
-    | ComponentDefinition
-    | ComponentInstance
-    | Assignment
-
-Meta ->
-    Keyword("meta") MetaSet Terminator(";")
-
-ComponentDefinition ->
-    Keyword("create") Keyword("component") Operator(":") Identifier(*) OpenBrace("{") ComponentBody CloseBrace("}") Terminator(";")
-
-ComponentInstance ->
-    Keyword("create") Identifier(*) Terminator(";")
-
-Assignment ->
-    Identifier(*) ...
-*/
-
-#[allow(non_snake_case)]
-fn parse_Node(lexer: &mut Lexer) -> Result<ASTNode, Error> {
-    match lexer.curr_token.t {
-        TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
-            "meta" => Ok(ASTNode::Meta(parse_Meta(lexer)?)),
-            "create" => {
-                lexer.consume_token();
-                match lexer.curr_token.t {
-                    TokenType::Keyword => {
-                        if lexer.curr_token.lexeme.as_str() == "component" {
-                            Ok(ASTNode::ComponentDefinition(parse_ComponentDefinition(
-                                lexer,
-                            )?))
-                        } else {
-                            Err(Error::new(
-                                ErrorKind::Other,
-                                "invalid node (component definition)",
-                            ))
-                        }
-                    }
-                    TokenType::Identifier => {
-                        Ok(ASTNode::ComponentInstance(parse_ComponentInstance(lexer)?))
-                    }
-                    _ => Err(Error::new(
-                        ErrorKind::Other,
-                        "invalid node (component definition vs instance)",
-                    )),
-                }
+// kind == "warning" || "error"
+macro_rules! print_issues {
+    ($vec:expr, $kind:expr) => {
+        if !$vec.is_empty() {
+            for i in $vec.iter() {
+                println!("{} on line {}: {}", $kind, i.0, i.1);
             }
-            _ => Err(Error::new(ErrorKind::Other, "invalid node (keyword)")),
-        },
-        TokenType::Identifier => Ok(ASTNode::Assignment(parse_Assignment(lexer)?)),
-        _ => Err(Error::new(ErrorKind::Other, "invalid node (non-node)")),
-    }
-}
-
-/*
-Meta ->
-    Keyword("meta") MetaSet Terminator(";")
-
-MetaSet ->
-    Keyword("components")
-    | Keyword("view")
-*/
-
-#[allow(non_snake_case)]
-fn parse_MetaSet(lexer: &mut Lexer) -> Result<Meta, Error> {
-    expect_token(lexer, TokenType::Keyword)?;
-    match lexer.curr_token.lexeme.as_str() {
-        "components" => {
-            lexer.consume_token();
-            Ok(Meta::Components)
         }
-        "view" => {
-            lexer.consume_token();
-            Ok(Meta::View)
+    };
+}
+
+// kind == "warning" || "error"
+macro_rules! return_issues {
+    ($vec:expr, $kind:expr) => {
+        print_issues!($vec, $kind);
+        if !$vec.is_empty() {
+            return None;
         }
-        _ => Err(Error::new(ErrorKind::Other, "bad keyword")),
-    }
-
-    // if lexer.curr_token.t == TokenType::Keyword && lexer.curr_token.lexeme == "components" {
-    //     Ok(Meta::Components)
-    // } else if lexer.curr_token.t == TokenType::Keyword && lexer.curr_token.lexeme == "view" {
-    //     Ok(Meta::View)
-    // } else {
-    //     Err(Error::new(ErrorKind::Other, "INVALID"))?
-    // }
+    };
 }
 
-#[allow(non_snake_case)]
-fn parse_Meta(lexer: &mut Lexer) -> Result<Meta, Error> {
-    expect(lexer, TokenType::Keyword, "meta")?;
-    lexer.consume_token();
-    let s = parse_MetaSet(lexer)?;
-    expect_token(lexer, TokenType::Terminator)?;
-    lexer.consume_token();
-    Ok(s)
-
-    // match lexer.curr_token.t {
-    //     TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
-    //         "meta" => {
-    //             lexer.consume_token();
-    //             match parse_MetaSet(lexer) {
-    //                 Ok(s) => match lexer.curr_token.t {
-    //                     TokenType::Terminator => {
-    //                         lexer.consume_token();
-    //                         Ok(s)
-    //                     }
-    //                     _ => Err(Error::new(ErrorKind::Other, "terminator not found")),
-    //                 },
-    //                 Err(E) => Err(E),
-    //             }
-    //         }
-    //         _ => Err(Error::new(ErrorKind::Other, "bad keyword")),
-    //     },
-    //     _ => Err(Error::new(ErrorKind::Other, "not a keyword")),
-    // }
-}
-
-/*
-ComponentDefinition ->
-    Keyword("create") Keyword("component") Operator(":") Identifier(*) OpenBrace("{") ComponentBody CloseBrace("}") Terminator(";")
-
-ComponentBody ->
-    ComponentProperties*
-
-ComponentProperties ->
-    VarsP
-    | DefaultP
-    | HtmlTemplateP
-    | CssTemplateP
-    | JSTemplateP
-*/
-
-fn expect_token(lexer: &Lexer, t: TokenType) -> Result<(), Error> {
+pub fn expect_token(lexer: &Lexer, t: TokenType) -> Result<(), Error> {
     match lexer.curr_token.t {
         comp if comp == t => Ok(()),
         _ => Err(Error::new(
@@ -265,7 +39,7 @@ fn expect_token(lexer: &Lexer, t: TokenType) -> Result<(), Error> {
     }
 }
 
-fn expect(lexer: &Lexer, t: TokenType, lexeme: &str) -> Result<(), Error> {
+pub fn expect(lexer: &Lexer, t: TokenType, lexeme: &str) -> Result<(), Error> {
     expect_token(lexer, t)?;
     match lexer.curr_token.lexeme.as_str() {
         comp if comp == lexeme => Ok(()),
@@ -276,300 +50,17 @@ fn expect(lexer: &Lexer, t: TokenType, lexeme: &str) -> Result<(), Error> {
     }
 }
 
-#[allow(non_snake_case)]
-fn parse_StrList(lexer: &mut Lexer) -> Result<Vec<String>, Error> {
-    let mut strs: Vec<String> = Vec::new();
-    expect_token(lexer, TokenType::String)?;
-    strs.push(lexer.curr_token.lexeme.clone());
-    lexer.consume_token();
-    if lexer.curr_token.t == TokenType::Operator && lexer.curr_token.lexeme == "," {
-        lexer.consume_token();
-        let mut ext = parse_StrList(lexer)?;
-        strs.append(&mut ext);
-    }
-    Ok(strs)
-}
-
-#[allow(non_snake_case)]
-fn parse_VarsP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {
-    expect(lexer, TokenType::Identifier, "vars")?;
-    lexer.consume_token();
-    expect(lexer, TokenType::Operator, "=")?;
-    lexer.consume_token();
-    expect_token(lexer, TokenType::OpenBracket)?;
-    lexer.consume_token();
-    let strs: Vec<String> = parse_StrList(lexer)?;
-    expect_token(lexer, TokenType::CloseBracket)?;
-    lexer.consume_token();
-    expect_token(lexer, TokenType::Terminator)?;
-    lexer.consume_token();
-
-    def.vars.extend(strs);
-
-    Ok(())
-}
-
-#[allow(non_snake_case)]
-fn parse_Template(lexer: &mut Lexer, mutator: &mut Option<String>) -> Result<(), Error> {
-    lexer.consume_token();
-
-    expect(lexer, TokenType::Operator, "=")?;
-    lexer.consume_token();
-    expect_token(lexer, TokenType::String)?;
-    *mutator = Some(lexer.curr_token.lexeme.clone());
-    lexer.consume_token();
-    expect_token(lexer, TokenType::Terminator)?;
-    lexer.consume_token();
-
-    Ok(())
-}
-
-// #[allow(non_snake_case)]
-// fn parse_HtmlTemplateP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {}
-//
-// #[allow(non_snake_case)]
-// fn parse_CssTemplateP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {}
-//
-// #[allow(non_snake_case)]
-// fn parse_JSTemplateP(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {}
-
-#[allow(non_snake_case)]
-fn parse_ComponentProperty(lexer: &mut Lexer, def: &mut ComponentDefinition) -> Result<(), Error> {
-    expect_token(lexer, TokenType::Identifier)?;
-    match lexer.curr_token.lexeme.as_str() {
-        "vars" => parse_VarsP(lexer, def),
-        "default" => parse_Template(lexer, &mut def.default_var),
-        "html" => parse_Template(lexer, &mut def.html),
-        "css" => parse_Template(lexer, &mut def.css),
-        "js" => parse_Template(lexer, &mut def.js),
-        _ => Err(Error::new(ErrorKind::Other, "invalid property")),
-    }
-}
-
-#[allow(non_snake_case)]
-fn parse_ComponentBody(lexer: &mut Lexer, n: String) -> Result<ComponentDefinition, Error> {
-    let mut def = ComponentDefinition {
-        name: n,
-        vars: Vec::new(),
-        default_var: None,
-        html: None,
-        css: None,
-        js: None,
-    };
-
-    while lexer.curr_token.t != TokenType::CloseBrace {
-        parse_ComponentProperty(lexer, &mut def)?;
-    }
-
-    Ok(def)
-}
-
-#[allow(non_snake_case)]
-fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinition, Error> {
-    // expect(lexer, TokenType::Keyword, "create")?;
-    // lexer.consume_token();
-    expect(lexer, TokenType::Keyword, "component")?;
-    lexer.consume_token();
-    expect(lexer, TokenType::Operator, ":")?;
-    lexer.consume_token();
-    expect_token(lexer, TokenType::Identifier)?;
-    let name = lexer.curr_token.lexeme.clone();
-    lexer.consume_token();
-    expect_token(lexer, TokenType::OpenBrace)?;
-    lexer.consume_token();
-    let def = parse_ComponentBody(lexer, name)?;
-    expect_token(lexer, TokenType::CloseBrace)?;
-    lexer.consume_token();
-    expect_token(lexer, TokenType::Terminator)?;
-    lexer.consume_token();
-    Ok(def)
-}
-
-/*
-ComponentInstance ->
-    Keyword("create") Identifier(*) Terminator(";")
-    | Keyword("create") Identifier(*) Operator(":") Identifier(*) Terminator(";")
-    | Keyword("create") Identifier(*) Operator(":") Identifier(*) Operator("=") String(*) Terminator(";")
-*/
-
-#[allow(non_snake_case)]
-fn parse_ComponentInstance(lexer: &mut Lexer) -> Result<ComponentInstance, Error> {
-    // expect(lexer, TokenType::Keyword, "create")?;
-    // lexer.consume_token();
-    expect_token(lexer, TokenType::Identifier)?;
-    let mut inst = ComponentInstance {
-        component: lexer.curr_token.lexeme.clone(),
-        identifier: None,
-        // fields: HashMap::new(),
-        default: None,
-    };
-    lexer.consume_token();
-    match lexer.curr_token.t {
-        // Rule 1
-        TokenType::Terminator => {
-            lexer.consume_token();
-            Ok(inst.clone())
-        }
-        TokenType::Operator => {
-            expect(lexer, TokenType::Operator, ":")?;
-            lexer.consume_token();
-            expect_token(lexer, TokenType::Identifier)?;
-            inst.identifier = Some(lexer.curr_token.lexeme.clone());
-            lexer.consume_token();
-            match lexer.curr_token.t {
-                // Rule 2
-                TokenType::Terminator => {
-                    lexer.consume_token();
-                    Ok(inst.clone())
-                }
-                // Rule 3
-                TokenType::Operator => {
-                    expect(lexer, TokenType::Operator, "=")?;
-                    lexer.consume_token();
-                    expect_token(lexer, TokenType::String)?;
-                    // oops, this doesnt guarantee the definition, so i cant actually scan that
-                    // until actually doing analysis
-                    // inst.fields.insert(
-                    //     inst.identifier.clone().unwrap(),
-                    //     lexer.curr_token.lexeme.clone(),
-                    // );
-                    inst.default = Some(lexer.curr_token.lexeme.clone());
-                    lexer.consume_token();
-                    expect_token(lexer, TokenType::Terminator)?;
-                    lexer.consume_token();
-                    Ok(inst.clone())
-                }
-                _ => Err(Error::new(ErrorKind::Other, "invalid component instance")),
-            }
-        }
-        _ => Err(Error::new(ErrorKind::Other, "invalid component instance")),
-    }
-}
-
-/*
-Assignment ->
-    Identifier(*) Operator(".") Identifier(*) Operator("=") String(*) Terminator(";")
-*/
-
-#[allow(non_snake_case)]
-fn parse_Assignment(lexer: &mut Lexer) -> Result<Assignment, Error> {
-    expect_token(lexer, TokenType::Identifier)?;
-    let mut assignment = Assignment {
-        component_identifier: lexer.curr_token.lexeme.clone(),
-        field: String::from(""),
-        value: String::from(""),
-    };
-    lexer.consume_token();
-    expect(lexer, TokenType::Operator, ".")?;
-    lexer.consume_token();
-    expect_token(lexer, TokenType::Identifier)?;
-    assignment.field = lexer.curr_token.lexeme.clone();
-    lexer.consume_token();
-    expect(lexer, TokenType::Operator, "=")?;
-    lexer.consume_token();
-    expect_token(lexer, TokenType::String)?;
-    assignment.value = lexer.curr_token.lexeme.clone();
-    lexer.consume_token();
-    expect_token(lexer, TokenType::Terminator)?;
-    lexer.consume_token();
-    Ok(assignment)
-}
-
-// Wtf am i doing bro
-/*
-#[allow(non_snake_case)]
-pub fn parse_ComponentDefinition(lexer: &mut Lexer) -> Result<ComponentDefinition, Error> {
-    match lexer.curr_token.t {
-        TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
-            "create" => {
-                lexer.consume_token();
-                // keyword(component)
-                match lexer.curr_token.t {
-                    TokenType::Keyword => match lexer.curr_token.lexeme.as_str() {
-                        "component" => {
-                            lexer.consume_token();
-                            // Operator
-                            match lexer.curr_token.t {
-                                TokenType::Operator => match lexer.curr_token.lexeme.as_str() {
-                                    ":" => {
-                                        lexer.consume_token();
-                                        // component name (Identifier)
-                                        match lexer.curr_token.t {
-                                            TokenType::Identifier => {
-                                                let n = lexer.curr_token.lexeme.clone();
-                                                lexer.consume_token();
-                                                // block
-                                                match lexer.curr_token.t {
-                                                    TokenType::OpenBrace => {
-                                                        lexer.consume_token();
-                                                        match parse_ComponentBody(lexer, n) {
-                                                            Ok(s) => match lexer.curr_token.t {
-                                                                TokenType::CloseBrace => {
-                                                                    lexer.consume_token();
-                                                                    match lexer.curr_token.t {
-                                                                        TokenType::Terminator => {
-                                                                            lexer.consume_token();
-                                                                            // let mut def = ComponentDefinition {
-                                                                            //     name: n,
-                                                                            //     vars: Vec::new(),
-                                                                            //     default_var: None,
-                                                                            //     html: None,
-                                                                            //     css: None,
-                                                                            //     js: None,
-                                                                            // };
-                                                                            Ok(s)
-                                                                        }
-                                                                        _ => Err(Error::new(
-                                                                            ErrorKind::Other,
-                                                                            "unterminated",
-                                                                        )),
-                                                                    }
-                                                                }
-                                                                _ => Err(Error::new(
-                                                                    ErrorKind::Other,
-                                                                    "not a block",
-                                                                )),
-                                                            },
-                                                            Err(E) => Err(E),
-                                                        }
-                                                    }
-                                                    _ => Err(Error::new(
-                                                        ErrorKind::Other,
-                                                        "not a block",
-                                                    )),
-                                                }
-                                            }
-                                            _ => Err(Error::new(
-                                                ErrorKind::Other,
-                                                "not a identifier",
-                                            )),
-                                        }
-                                    }
-                                    _ => Err(Error::new(ErrorKind::Other, "expected ':'")),
-                                },
-                                _ => Err(Error::new(ErrorKind::Other, "not a operator")),
-                            }
-                        }
-                        _ => Err(Error::new(ErrorKind::Other, "expected 'component'")),
-                    },
-                    _ => Err(Error::new(ErrorKind::Other, "not a keyword")),
-                }
-            }
-            _ => Err(Error::new(ErrorKind::Other, "expected 'create'")),
-        },
-        _ => Err(Error::new(ErrorKind::Other, "not a keyword")),
-    }
-}
-*/
-
 pub fn parse_file(file: File) -> Option<AST> {
     let mut ast = AST { nodes: Vec::new() };
-    let mut errors: Vec<(Error, u128)> = Vec::new();
+    let mut errors: Vec<(u128, Error)> = Vec::new();
+    let mut warnings: Vec<(u128, String)> = Vec::new();
 
     let mut lexer = Lexer::new(file);
     // ast.nodes.push(parse_Node(&mut lexer));
     lexer.consume_token();
     // lexer.curr_token.t = TokenType::INVALID;
+
+    // Syntactical Analysis and AST generation
     while lexer.curr_token.t != TokenType::EOF {
         // for _ in 0..2 {
         let node = parse_Node(&mut lexer);
@@ -579,40 +70,29 @@ pub fn parse_file(file: File) -> Option<AST> {
                 ast.nodes.push(s);
             }
             Err(e) => {
-                errors.push((e, lexer.line));
+                errors.push((lexer.line - 1, e));
                 lexer.consume_token();
             }
         }
     }
 
-    if errors.is_empty() {
-        Some(ast)
-    } else {
-        // println!("{:#?}", errors);
-        for i in errors.iter() {
-            println!("line {}: {}", i.1, i.0);
-        }
-        None
-    }
-}
+    return_issues!(errors, "error");
 
-// fn parse_statement(ctx: &[String], statement: Vec<Token>) -> Option<String> {
-//     for token in statement {
-//         match token.t {
-//             TokenType::Keyword => {}
-//             TokenType::Identifier => {}
-//             TokenType::String => {}
-//             TokenType::Number => {}
-//             TokenType::Separator => {}
-//             TokenType::Operator => {}
-//             TokenType::Terminator => {}
-//             TokenType::OpenBrace => {}
-//             TokenType::CloseBrace => {}
-//             TokenType::OpenBracket => {}
-//             TokenType::CloseBracket => {}
-//             TokenType::EOF => {}
-//             TokenType::INVALID => {}
-//         }
-//     }
-//     return None;
-// }
+    // Semantic Analysis
+    match semantic_analysis(&ast) {
+        Some(issues) => {
+            for (line, issue) in issues.into_iter() {
+                match issue {
+                    Issue::Error(e) => errors.push((line, e)),
+                    Issue::Warn(s) => warnings.push((line, s.to_string())),
+                }
+            }
+        }
+        None => {}
+    }
+
+    print_issues!(warnings, "warning");
+    return_issues!(errors, "error");
+
+    Some(ast)
+}

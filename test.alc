@@ -10,6 +10,7 @@ meta view;
 
 create text; # <p></p>
 create text: a = "hello, world!"; # <p>hello, world!</p>
+#syntax error
 create text: b; # <p>/<p>
 b.text = "hello, world!"; # changes b to <p>hello, world!</p>
 #syntax error

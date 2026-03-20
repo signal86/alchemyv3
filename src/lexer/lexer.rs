@@ -181,6 +181,7 @@ impl Lexer {
                     let mut void = [0; 1];
                     let read = self.reader.read(&mut void).unwrap();
                     if read == 0 || (void[0] as char) == '\n' {
+                        self.line += 1;
                         break;
                     }
                 }
