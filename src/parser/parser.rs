@@ -64,7 +64,7 @@ pub fn parse_file(file: File) -> Option<AST> {
     while lexer.curr_token.t != TokenType::EOF {
         // for _ in 0..2 {
         let node = parse_Node(&mut lexer);
-        println!("{:#?}", node);
+        // println!("{:#?}", node);
         match node {
             Ok(s) => {
                 ast.nodes.push(s);

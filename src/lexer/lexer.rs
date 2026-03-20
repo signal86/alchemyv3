@@ -114,7 +114,7 @@ impl Lexer {
     // I made next_token (previously consume_token) a bunch of returns despite having already written the parser as a bunch of reads on curr_token, so this is my stupid fix
     pub fn consume_token(&mut self) {
         self.curr_token = self.next_token();
-        println!("consumed {:#?}", self.curr_token);
+        // println!("consumed {:#?}", self.curr_token);
     }
 
     // Oops

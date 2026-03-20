@@ -110,7 +110,7 @@ pub enum Meta {
 
 #[derive(Debug, Clone)]
 pub struct ComponentDefinition {
-    pub name: String,
+    pub identifier: String,
     pub vars: Vec<String>,
     pub default_var: Option<String>,
     pub html: Option<String>, // template
@@ -351,7 +351,7 @@ fn parse_ComponentProperty(lexer: &mut Lexer, def: &mut ComponentDefinition) -> 
 #[allow(non_snake_case)]
 fn parse_ComponentBody(lexer: &mut Lexer, n: String) -> Result<ComponentDefinition, Error> {
     let mut def = ComponentDefinition {
-        name: n,
+        identifier: n,
         vars: Vec::new(),
         default_var: None,
         html: None,
