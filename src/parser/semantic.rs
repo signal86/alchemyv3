@@ -56,16 +56,23 @@ impl Context {
     }
 
     pub fn get_definition(&self, search: &str) -> Result<&ComponentDefinition, Error> {
-        match self.is_defined(&search) {
-            true => self
-                .definitions
-                .get(&search.to_string())
-                .ok_or_else(|| Error::new(ErrorKind::Other, "No component definition exists")),
-            false => Err(Error::new(
-                ErrorKind::Other,
-                "No component definition exists",
-            )),
-        }
+        println!(
+            "Instance IDs: {:#?}\nInverse Instance IDs: {:#?}\nDefinitions: {:#?}",
+            self.instance_ids, self.inverse_instance_ids, self.definitions
+        );
+        // self.definitions
+        //     .get(&search.to_string())
+        //     .ok_or_else(|| Error::new(ErrorKind::Other, "No component definition exists"))
+        // match self.is_defined(&search) {
+        //     true => self
+        //         .definitions
+        //         .get(&search.to_string())
+        //         .ok_or_else(|| Error::new(ErrorKind::Other, "No component definition exists")),
+        //     false => Err(Error::new(
+        //         ErrorKind::Other,
+        //         "No component definition exists",
+        //     )),
+        // }
     }
 
     pub fn is_initialized(&self, search: &str) -> bool {
@@ -211,6 +218,7 @@ fn meta_view_analysis(ast: &AST, context: &mut Context) -> Option<Vec<(u128, Iss
                     ));
                 } else {
                     // check specified field exists
+                    // println!("line: {}", node.line);
                     let def = context
                         .get_definition(assgn.component_identifier.as_str())
                         .unwrap();
