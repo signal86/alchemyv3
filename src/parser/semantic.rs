@@ -56,13 +56,34 @@ impl Context {
     }
 
     pub fn get_definition(&self, search: &str) -> Result<&ComponentDefinition, Error> {
-        println!(
-            "Instance IDs: {:#?}\nInverse Instance IDs: {:#?}\nDefinitions: {:#?}",
-            self.instance_ids, self.inverse_instance_ids, self.definitions
-        );
+        // println!(
+        //     "Instance IDs: {:#?}\nInverse Instance IDs: {:#?}\nDefinitions: {:#?}",
+        //     self.instance_ids, self.inverse_instance_ids, self.definitions
+        // );
         // self.definitions
         //     .get(&search.to_string())
         //     .ok_or_else(|| Error::new(ErrorKind::Other, "No component definition exists"))
+        match self.get_instance(&search) {
+            Ok(inst) => {
+                return self
+                    .definitions
+                    .get(&inst.component)
+                    .ok_or_else(|| Error::new(ErrorKind::Other, "No component definition exists"));
+            }
+            Err(e) => return Err(e),
+            // true => {
+            //     let a = self.inverse_instance_ids.get(&search.to_string()).unwrap();
+            //     let instance = self.instance_ids.get(a).unwrap();
+            //     return self
+            //         .definitions
+            //         .get(&instance.component)
+            //         .ok_or_else(|| Error::new(ErrorKind::Other, "No component definition exists"));
+            // }
+            // false => Err(Error::new(
+            //     ErrorKind::Other,
+            //     "No component definition exists",
+            // )),
+        }
         // match self.is_defined(&search) {
         //     true => self
         //         .definitions
@@ -80,7 +101,18 @@ impl Context {
             .contains_key(&(search.to_string()))
     }
 
-    pub fn get_instance(&mut self, search: &str) -> Result<&mut ComponentInstance, Error> {
+    pub fn get_instance(&self, search: &str) -> Result<&ComponentInstance, Error> {
+        // let e = Error::new(ErrorKind::Other, "No component definition exists");
+        let id = self
+            .inverse_instance_ids
+            .get(&(search.to_string()))
+            .ok_or_else(|| Error::new(ErrorKind::Other, "No component is initialized"))?;
+        self.instance_ids
+            .get(id)
+            .ok_or_else(|| Error::new(ErrorKind::Other, "No component is initialized"))
+    }
+
+    pub fn get_instance_mut(&mut self, search: &str) -> Result<&mut ComponentInstance, Error> {
         // let e = Error::new(ErrorKind::Other, "No component definition exists");
         let id = self
             .inverse_instance_ids
@@ -91,7 +123,13 @@ impl Context {
             .ok_or_else(|| Error::new(ErrorKind::Other, "No component is initialized"))
     }
 
-    pub fn last_component(&mut self) -> Result<&mut ComponentInstance, Error> {
+    pub fn last_component(&self) -> Result<&ComponentInstance, Error> {
+        self.instance_ids
+            .get(&(self.count - 1))
+            .ok_or(Error::new(ErrorKind::Other, "No component is initialized"))
+    }
+
+    pub fn last_component_mut(&mut self) -> Result<&mut ComponentInstance, Error> {
         self.instance_ids
             .get_mut(&(self.count - 1))
             .ok_or(Error::new(ErrorKind::Other, "No component is initialized"))

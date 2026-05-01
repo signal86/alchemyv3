@@ -92,6 +92,8 @@ fn match_buffer(buffer: &mut String) -> Option<Token> {
 pub struct Lexer {
     pub curr_token: Token,
     reader: BufReader<File>,
+    // When the characters are read, the end of a token is determined by reading the start of
+    // another token, so pushback is made because the reader can't move in reverse
     pushback: Option<char>,
     eof: bool,
     pub line: u128,
