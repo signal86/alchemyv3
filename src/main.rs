@@ -1,9 +1,13 @@
 use std::env;
 use std::fs::File;
 use std::io;
+mod intermediate;
 mod lexer;
 mod parser;
+use intermediate::intermediate::patch_ast;
 use parser::parser::parse_file;
+use parser::semantic::Context;
+use parser::syntax::AST;
 // use std::io::{BufRead, BufReader};
 // mod lexer;
 // use lexer::lexer::lex;
@@ -25,11 +29,16 @@ fn main() -> io::Result<()> {
 
     let fname = &args[1];
     let file = File::open(fname)?;
-    let parse_tree = parse_file(file);
-    match parse_tree {
-        Some(s) => println!("{:#?}", s),
+    // let parse_tree = parse_file(file);
+    let parse_tree: AST;
+    let context: Context;
+    match parse_file(file) {
+        Some(s) => (parse_tree, context) = s,
+        // println!("{:#?}", s);
         None => return Err(io::Error::new(io::ErrorKind::Other, "parse failed")),
     }
+
+    println!("{:#?}", context);
 
     // let r = BufReader::new(file);
     // for (_, line) in r.lines().enumerate() {

@@ -15,8 +15,9 @@ create text: b; # <p>/<p>
 # warn test
 create component: water {
     vars = ["flavor"];
-    default = "wa";
+    default = "flavor";
     html = "<h1>{{flavor}}</p>";
 };
 b.text = "hello, world!"; # changes b to <p>hello, world!</p>
+create water: alpha;
 #syntax error

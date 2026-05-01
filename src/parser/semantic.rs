@@ -8,6 +8,7 @@ pub enum Issue {
     Warn(String),
 }
 
+#[derive(Debug)]
 pub struct Context {
     definitions: HashMap<String, ComponentDefinition>,
     instance_ids: HashMap<usize, ComponentInstance>,
@@ -236,7 +237,22 @@ fn meta_view_analysis(ast: &AST, context: &mut Context) -> Option<Vec<(u128, Iss
                 context.initialize_component(inst.clone());
             }
             ASTNodeT::ComponentDefinition(inst) => {
+                match valid_definition(&context, &inst) {
+                    Ok(n) => {
+                        if n.len() > 0 {
+                            for issue in n.into_iter() {
+                                issues.push((node.line, issue));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        for issue in e.into_iter() {
+                            issues.push((node.line, issue));
+                        }
+                    }
+                }
                 context.define_component(inst.clone());
+
                 issues.push((
                     node.line,
                     Issue::Warn(
@@ -284,16 +300,16 @@ fn meta_view_analysis(ast: &AST, context: &mut Context) -> Option<Vec<(u128, Iss
     None
 }
 
-pub fn semantic_analysis(ast: &AST) -> Option<Vec<(u128, Issue)>> {
+pub fn semantic_analysis(ast: &AST, context: &mut Context) -> Option<Vec<(u128, Issue)>> {
     let mut issues: Vec<(u128, Issue)> = Vec::new();
-    let mut context: Context = Context::new();
+    // let mut context: Context = Context::new();
 
-    match meta_components_analysis(ast, &mut context) {
+    match meta_components_analysis(ast, context) {
         None => {}
         Some(i) => issues.extend(i.into_iter()),
     }
 
-    match meta_view_analysis(ast, &mut context) {
+    match meta_view_analysis(ast, context) {
         None => {}
         Some(i) => issues.extend(i.into_iter()),
     }

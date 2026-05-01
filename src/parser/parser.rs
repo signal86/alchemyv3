@@ -2,6 +2,7 @@ use super::semantic::*;
 use super::syntax::*;
 use crate::lexer::lexer::Lexer;
 use crate::lexer::token::TokenType;
+use crate::parser::semantic::Context;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -9,6 +10,8 @@ use std::io::{Error, ErrorKind};
 // use std::io;
 
 // kind == "warning" || "error"
+#[macro_export]
+#[macro_use]
 macro_rules! print_issues {
     ($vec:expr, $kind:expr) => {
         if !$vec.is_empty() {
@@ -20,6 +23,8 @@ macro_rules! print_issues {
 }
 
 // kind == "warning" || "error"
+#[macro_export]
+#[macro_use]
 macro_rules! return_issues {
     ($vec:expr, $kind:expr) => {
         print_issues!($vec, $kind);
@@ -50,7 +55,7 @@ pub fn expect(lexer: &Lexer, t: TokenType, lexeme: &str) -> Result<(), Error> {
     }
 }
 
-pub fn parse_file(file: File) -> Option<AST> {
+pub fn parse_file(file: File) -> Option<(AST, Context)> {
     let mut ast = AST { nodes: Vec::new() };
     let mut errors: Vec<(u128, Error)> = Vec::new();
     let mut warnings: Vec<(u128, String)> = Vec::new();
@@ -79,7 +84,8 @@ pub fn parse_file(file: File) -> Option<AST> {
     return_issues!(errors, "error");
 
     // Semantic Analysis
-    match semantic_analysis(&ast) {
+    let mut ctx = Context::new();
+    match semantic_analysis(&ast, &mut ctx) {
         Some(issues) => {
             for (line, issue) in issues.into_iter() {
                 match issue {
@@ -94,5 +100,5 @@ pub fn parse_file(file: File) -> Option<AST> {
     print_issues!(warnings, "warning");
     return_issues!(errors, "error");
 
-    Some(ast)
+    Some((ast, ctx))
 }
